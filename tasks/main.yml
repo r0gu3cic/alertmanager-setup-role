@@ -1,0 +1,4 @@
+---
+- name: Setup Alertmanager on a server
+  import_tasks: alertmanager_setup.yml
+  when: ansible_facts['distribution'] | lower == 'ubuntu'

@@ -1,0 +1,88 @@
+---
+- name: Create Alertmanager system user
+  user:
+    name: alertmanager
+    shell: /bin/false
+    system: yes
+    create_home: no
+
+- name: Create Alertmanager directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: alertmanager
+    group: alertmanager
+    mode: "0755"
+  loop:
+    - /etc/alertmanager
+    - /etc/amtool
+    - /var/lib/alertmanager
+
+- name: Download Alertmanager tarball
+  get_url:
+    url: "https://github.com/prometheus/alertmanager/releases/download/v{{ alertmanager.version }}/alertmanager-{{ alertmanager.version }}.linux-amd64.tar.gz"
+    dest: /tmp/alertmanager.tar.gz
+    mode: "0644"
+
+- name: Extract Alertmanager tarball
+  unarchive:
+    src: /tmp/alertmanager.tar.gz
+    dest: /tmp/
+    remote_src: yes
+
+- name: Copy binaries to /usr/local/bin
+  copy:
+    src: "/tmp/alertmanager-{{ alertmanager.version }}.linux-amd64/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    owner: alertmanager
+    group: alertmanager
+    mode: "0755"
+    remote_src: yes
+  loop:
+    - alertmanager
+    - amtool
+
+- name: Copy default alertmanager.yml config
+  copy:
+    src: "/tmp/alertmanager-{{ alertmanager.version }}.linux-amd64/alertmanager.yml"
+    dest: /etc/alertmanager/alertmanager.yml
+    owner: alertmanager
+    group: alertmanager
+    mode: "0644"
+    remote_src: yes
+
+- name: Create amtool config
+  template:
+    src: "templates/amtool.config.j2"
+    dest: /etc/amtool/config.yml
+    owner: alertmanager
+    group: alertmanager
+    mode: "0644"
+
+- name: Create systemd unit file for Prometheus
+  template:
+    src: "templates/alertmanager.service.j2"
+    dest: /etc/systemd/system/alertmanager.service
+    owner: alertmanager
+    group: alertmanager
+    mode: "0644"
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: Start Alertmanager service
+  service:
+    name: alertmanager
+    state: started
+    enabled: yes
+
+- name: Remove Alertmanager tarball
+  file:
+    path: "/tmp/alertmanager-{{ alertmanager.version }}.linux-amd64.tar.gz"
+    state: absent
+
+- name: Remove extracted Alertmanager directory
+  file:
+    path: "/tmp/alertmanager-{{ alertmanager.version }}.linux-amd64"
+    state: absent
